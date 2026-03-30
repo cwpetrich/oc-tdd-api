@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TDD Pipeline Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid #1e293b;
+    background: #0f172a;
+  }
+  header h1 { font-size: 18px; font-weight: 600; color: #f8fafc; }
+  .meta { font-size: 12px; color: #64748b; display: flex; gap: 16px; align-items: center; }
+  .meta .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-ok { background: #22c55e; }
+  .dot-err { background: #ef4444; }
+  .dot-load { background: #eab308; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    padding: 20px 24px;
+    min-height: 300px;
+  }
+  .column {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 200px;
+  }
+  .column-header {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .col-ready .column-header { border-color: #64748b; color: #94a3b8; }
+  .col-red .column-header { border-color: #ef4444; color: #f87171; }
+  .col-green .column-header { border-color: #22c55e; color: #4ade80; }
+  .col-review .column-header { border-color: #a78bfa; color: #c4b5fd; }
+  .col-blocked .column-header { border-color: #eab308; color: #facc15; }
+
+  .count-badge {
+    background: #334155;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s;
+  }
+  .card:hover { border-color: #475569; }
+  .card a { color: inherit; text-decoration: none; }
+  .card a:hover { text-decoration: underline; }
+  .card-number { font-size: 12px; color: #64748b; }
+  .card-title {
+    font-size: 13px;
+    margin-top: 4px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-draft { background: #854d0e; color: #fef08a; }
+  .badge-pr { background: #1e3a5f; color: #93c5fd; }
+  .badge-ci-passing { background: #14532d; color: #86efac; }
+  .badge-ci-failing { background: #7f1d1d; color: #fca5a5; }
+  .badge-ci-pending { background: #713f12; color: #fde68a; }
+  .badge-ci-unknown { background: #334155; color: #94a3b8; }
+
+  .agents-section {
+    padding: 0 24px 24px;
+  }
+  .agents-section h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f8fafc;
+    margin-bottom: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #1e293b;
+  }
+  .agent-list { display: flex; flex-direction: column; gap: 8px; }
+  .agent-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .agent-key { color: #38bdf8; font-size: 12px; }
+  .agent-task { color: #cbd5e1; font-size: 13px; margin-top: 2px; }
+  .agent-runtime { color: #64748b; font-size: 12px; white-space: nowrap; }
+  .agent-status {
+    width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+    animation: pulse 1.5s infinite; margin-right: 10px; flex-shrink: 0;
+  }
+
+  .empty-state {
+    color: #475569;
+    font-size: 12px;
+    text-align: center;
+    padding: 24px 8px;
+    font-style: italic;
+  }
+
+  .loading-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .error-banner {
+    background: #7f1d1d;
+    color: #fca5a5;
+    padding: 10px 24px;
+    font-size: 13px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TDD Pipeline &mdash; decktician</h1>
+  <div class="meta">
+    <span id="status-dot" class="dot dot-load"></span>
+    <span id="status-text">Loading...</span>
+    <span id="countdown"></span>
+  </div>
+</header>
+
+<div id="error-banner" class="error-banner"></div>
+
+<div id="content">
+  <div class="loading-overlay" id="loading">Loading pipeline status...</div>
+</div>
+
+<script>
+const REFRESH_INTERVAL = 30;
+let countdown = 0;
+let countdownTimer = null;
+
+async function fetchStatus() {
+  const dot = document.getElementById("status-dot");
+  const text = document.getElementById("status-text");
+
+  dot.className = "dot dot-load";
+  text.textContent = "Refreshing...";
+  document.getElementById("error-banner").style.display = "none";
+
+  try {
+    const res = await fetch("/api/tdd-status");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    render(data);
+    dot.className = "dot dot-ok";
+    text.textContent = "Updated " + new Date(data.updatedAt).toLocaleTimeString();
+  } catch (err) {
+    dot.className = "dot dot-err";
+    text.textContent = "Error";
+    const banner = document.getElementById("error-banner");
+    banner.textContent = "Failed to fetch: " + err.message;
+    banner.style.display = "block";
+  }
+
+  countdown = REFRESH_INTERVAL;
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdown--;
+    document.getElementById("countdown").textContent = countdown > 0 ? countdown + "s" : "";
+    if (countdown <= 0) {
+      clearInterval(countdownTimer);
+      fetchStatus();
+    }
+  }, 1000);
+}
+
+function render(data) {
+  const columns = [
+    { key: "ready",   label: "Ready",   cls: "col-ready" },
+    { key: "red",     label: "Red",     cls: "col-red" },
+    { key: "green",   label: "Green",   cls: "col-green" },
+    { key: "review",  label: "Review",  cls: "col-review" },
+    { key: "blocked", label: "Blocked", cls: "col-blocked" },
+  ];
+
+  let html = '<div class="pipeline">';
+  for (const col of columns) {
+    const issues = data.issues[col.key] || [];
+    html += `<div class="column ${col.cls}">`;
+    html += `<div class="column-header"><span>${col.label}</span><span class="count-badge">${issues.length}</span></div>`;
+    if (issues.length === 0) {
+      html += '<div class="empty-state">No issues</div>';
+    }
+    for (const issue of issues) {
+      html += renderCard(issue);
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Agents
+  html += '<div class="agents-section">';
+  html += '<h2>Active Agents</h2>';
+  if (data.agents && data.agents.length > 0) {
+    html += '<div class="agent-list">';
+    for (const agent of data.agents) {
+      const runtime = formatRuntime(agent.runtimeMs);
+      html += `<div class="agent-card">
+        <div style="display:flex;align-items:center;">
+          <div class="agent-status"></div>
+          <div>
+            <div class="agent-key">${esc(agent.sessionKey)}</div>
+            <div class="agent-task">${esc(agent.task)}</div>
+          </div>
+        </div>
+        <div class="agent-runtime">${runtime}</div>
+      </div>`;
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="empty-state">No active agents</div>';
+  }
+  html += '</div>';
+
+  document.getElementById("content").innerHTML = html;
+}
+
+function renderCard(issue) {
+  let badges = '';
+  if (issue.pr) {
+    const pr = issue.pr;
+    if (pr.isDraft) {
+      badges += '<span class="badge badge-draft">Draft</span>';
+    } else {
+      badges += `<span class="badge badge-pr">PR #${pr.number}</span>`;
+    }
+    const ciCls = "badge-ci-" + (pr.ciStatus || "unknown");
+    badges += `<span class="badge ${ciCls}">${pr.ciStatus || "unknown"}</span>`;
+  }
+  return `<div class="card">
+    <a href="${esc(issue.url)}" target="_blank">
+      <div class="card-number">#${issue.number}</div>
+      <div class="card-title">${esc(issue.title)}</div>
+    </a>
+    ${badges ? '<div class="badges">' + badges + '</div>' : ''}
+  </div>`;
+}
+
+function formatRuntime(ms) {
+  if (!ms) return "";
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  if (m > 0) return m + "m " + (s % 60) + "s";
+  return s + "s";
+}
+
+function esc(str) {
+  if (!str) return "";
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+fetchStatus();
+</script>
+</body>
+</html>
