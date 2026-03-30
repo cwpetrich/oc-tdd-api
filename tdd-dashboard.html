@@ -245,6 +245,30 @@ function render(data) {
   html += '</div>';
 
   // Agents
+  // PRs awaiting review
+  const prs = data.prsAwaitingReview || [];
+  html += '<div class="agents-section">';
+  html += `<h2>PRs Awaiting Review <span class="count-badge" style="margin-left:8px">${prs.length}</span></h2>`;
+  if (prs.length > 0) {
+    html += '<div class="agent-list">';
+    for (const pr of prs) {
+      const ci = pr.ciStatus === "passing" ? "✅" : pr.ciStatus === "failing" ? "❌" : "⏳";
+      html += `<div class="agent-card">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px">${ci}</span>
+          <div>
+            <a href="${esc(pr.url)}" target="_blank" style="color:#a78bfa;text-decoration:none;">PR #${pr.number}</a>
+            <span style="color:#94a3b8;font-size:12px;margin-left:8px">${esc(pr.title)}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+  } else {
+    html += '<div class="empty-state">No PRs waiting for review</div>';
+  }
+  html += '</div>';
+
   html += '<div class="agents-section">';
   html += '<h2>Active Agents</h2>';
   if (data.agents && data.agents.length > 0) {

@@ -99,10 +99,27 @@ async function buildStatus() {
     // openclaw may not be available
   }
 
+  // D) Open PRs awaiting review (non-draft, not yet merged)
+  const reviewPRs = allPRs
+    .filter((p) => !p.isDraft)
+    .map((p) => {
+      let ciStatus = "unknown";
+      if (p.statusCheckRollup && p.statusCheckRollup.length > 0) {
+        const states = p.statusCheckRollup.map((c) =>
+          (c.conclusion || c.status || "").toUpperCase()
+        );
+        if (states.some((s) => s === "FAILURE" || s === "ERROR")) ciStatus = "failing";
+        else if (states.every((s) => s === "SUCCESS" || s === "SKIPPED")) ciStatus = "passing";
+        else ciStatus = "pending";
+      }
+      return { number: p.number, title: p.title, url: p.url, ciStatus };
+    });
+
   return {
     updatedAt: new Date().toISOString(),
     issues: buckets,
     agents,
+    prsAwaitingReview: reviewPRs,
   };
 }
 
