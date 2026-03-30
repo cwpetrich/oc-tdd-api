@@ -31,7 +31,7 @@
 
   .pipeline {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 12px;
     padding: 20px 24px;
     min-height: 300px;
@@ -54,6 +54,8 @@
     align-items: center;
     justify-content: space-between;
   }
+  .col-discover .column-header { border-color: #38bdf8; color: #7dd3fc; }
+  .col-not-ready .column-header { border-color: #f59e0b; color: #fcd34d; }
   .col-ready .column-header { border-color: #64748b; color: #94a3b8; }
   .col-red .column-header { border-color: #ef4444; color: #f87171; }
   .col-green .column-header { border-color: #22c55e; color: #4ade80; }
@@ -218,11 +220,13 @@ async function fetchStatus() {
 
 function render(data) {
   const columns = [
-    { key: "ready",   label: "Ready",   cls: "col-ready" },
-    { key: "red",     label: "Red",     cls: "col-red" },
-    { key: "green",   label: "Green",   cls: "col-green" },
-    { key: "review",  label: "Review",  cls: "col-review" },
-    { key: "blocked", label: "Blocked", cls: "col-blocked" },
+    { key: "discover",   label: "Discover",   cls: "col-discover" },
+    { key: "not-ready",  label: "Not Ready",  cls: "col-not-ready" },
+    { key: "ready",      label: "Ready",      cls: "col-ready" },
+    { key: "red",        label: "Red ✍️",     cls: "col-red" },
+    { key: "green",      label: "Green 🔨",   cls: "col-green" },
+    { key: "review",     label: "Review 👀",  cls: "col-review" },
+    { key: "blocked",    label: "Blocked 🚫", cls: "col-blocked" },
   ];
 
   let html = '<div class="pipeline">';
@@ -246,16 +250,16 @@ function render(data) {
   if (data.agents && data.agents.length > 0) {
     html += '<div class="agent-list">';
     for (const agent of data.agents) {
-      const runtime = formatRuntime(agent.runtimeMs);
+      const age = agent.ageMin != null ? `${agent.ageMin}m ago` : "";
       html += `<div class="agent-card">
         <div style="display:flex;align-items:center;">
           <div class="agent-status"></div>
           <div>
             <div class="agent-key">${esc(agent.sessionKey)}</div>
-            <div class="agent-task">${esc(agent.task)}</div>
+            <div class="agent-task">${esc(agent.model)}${agent.kind ? " · " + esc(agent.kind) : ""}</div>
           </div>
         </div>
-        <div class="agent-runtime">${runtime}</div>
+        <div class="agent-runtime">${age}</div>
       </div>`;
     }
     html += '</div>';

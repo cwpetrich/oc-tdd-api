@@ -43,7 +43,7 @@ async function buildStatus() {
   );
   const allIssues = JSON.parse(issuesRaw || "[]");
 
-  const buckets = { ready: [], red: [], green: [], review: [], blocked: [] };
+  const buckets = { discover: [], "not-ready": [], ready: [], red: [], green: [], review: [], blocked: [] };
 
   for (const issue of allIssues) {
     const stateLabels = (issue.labels || [])
@@ -51,7 +51,7 @@ async function buildStatus() {
       .filter((n) => n.startsWith("state:"));
     for (const label of stateLabels) {
       const key = label.replace("state:", "");
-      if (buckets[key]) {
+      if (buckets[key] !== undefined) {
         buckets[key].push({
           number: issue.number,
           title: issue.title,
@@ -67,7 +67,7 @@ async function buildStatus() {
   );
   const allPRs = JSON.parse(prsRaw || "[]");
 
-  const activeBuckets = ["red", "green", "review"];
+  const activeBuckets = ["discover", "not-ready", "ready", "red", "green", "review"];
   for (const bucket of activeBuckets) {
     for (const issue of buckets[bucket]) {
       issue.pr = findPRForIssue(issue.number, allPRs);
@@ -75,23 +75,26 @@ async function buildStatus() {
   }
 
   // C) Active agents
-  const agentsRaw = execSafe(`openclaw sessions --active 15 --json 2>/dev/null`);
+  const agentsRaw = execSafe(`openclaw sessions --active 10 --agent ender --json 2>/dev/null`);
   let agents = [];
   try {
-    const sessions = JSON.parse(agentsRaw || "[]");
+    const parsed = JSON.parse(agentsRaw || "{}");
+    const sessions = parsed.sessions || parsed || [];
     agents = sessions
-      .filter(
-        (s) =>
-          s.sessionKey &&
-          s.sessionKey.includes("ender") &&
-          s.status === "active"
-      )
-      .map((s) => ({
-        sessionKey: s.sessionKey,
-        task: s.task || s.description || "",
-        status: s.status,
-        runtimeMs: s.runtimeMs || 0,
-      }));
+      .filter((s) => {
+        const key = s.key || s.sessionKey || "";
+        return key.includes("ender") || key.includes("subagent");
+      })
+      .map((s) => {
+        const key = s.key || s.sessionKey || "";
+        const ageMin = s.ageMs ? Math.round(s.ageMs / 60000) : null;
+        return {
+          sessionKey: key,
+          model: s.model || "",
+          ageMin,
+          kind: s.kind || "",
+        };
+      });
   } catch {
     // openclaw may not be available
   }
